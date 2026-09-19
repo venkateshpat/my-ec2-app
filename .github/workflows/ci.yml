@@ -1,0 +1,23 @@
+name: My EC2 App CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate HTML
+        run: |
+          test -f index.html
+          grep -q "Hello from AWS EC2" index.html
+          echo "HTML validation passed!"
