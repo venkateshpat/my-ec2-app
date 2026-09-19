@@ -38,16 +38,24 @@ jobs:
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build Docker image
+  run: |
+    docker build \
+      -t $ECR_REPOSITORY:${{ github.sha }} \
+      .
+      - name: Build Docker image
         run: |
-          docker build -t $ECR_REPOSITORY:1.0 .
+          docker build \
+            -t $ECR_REPOSITORY:${{ github.sha }} \
+            .
 
       - name: Tag Docker image
         run: |
           docker tag \
-            $ECR_REPOSITORY:1.0 \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:1.0
+            $ECR_REPOSITORY:${{ github.sha }} \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
 
       - name: Push Docker image to ECR
         run: |
           docker push \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:1.0
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+            
