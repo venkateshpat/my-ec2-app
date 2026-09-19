@@ -1,23 +1,53 @@
-name: My EC2 App CI
+name: My EC2 App CI/CD
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: my-ec2-app
+  AWS_ACCOUNT_ID: "251869519234"
 
 jobs:
-  validate:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Validate HTML
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::251869519234:role/GitHubActions-ECR-MyApp-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
         run: |
-          test -f index.html
-          grep -q "Hello from AWS EC2" index.html
-          echo "HTML validation passed!"
+          aws ecr get-login-password \
+            --region $AWS_REGION | \
+            docker login \
+            --username AWS \
+            --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Build Docker image
+        run: |
+          docker build -t $ECR_REPOSITORY:1.0 .
+
+      - name: Tag Docker image
+        run: |
+          docker tag \
+            $ECR_REPOSITORY:1.0 \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:1.0
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:1.0
