@@ -37,7 +37,7 @@ jobs:
             --password-stdin \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-            - name: Build Docker image
+      - name: Build Docker image
         run: |
           docker build \
             -t $ECR_REPOSITORY:${{ github.sha }} \
