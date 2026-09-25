@@ -69,19 +69,10 @@ jobs:
               ("docker pull " + $image),
               "docker rm -f my-ec2-app || true",
               ("docker run -d --name my-ec2-app --restart unless-stopped -p 8080:8080 " + $image),
-              "\"for i in 1 2 3 4 5 6 7 8 9 10; do curl -fsS http://127.0.0.1:8080 && exit 0; sleep 2; done; exit 1\""
+              \"sleep 5\",
+          \"curl -fsS http://127.0.0.1:8080\"
             ]')
 
-          COMMAND_ID=$(aws ssm send-command \
-            --region "$AWS_REGION" \
-            --instance-ids "i-08e8bec7102526dac" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy ${{ github.sha }}" \
-            --parameters "{\"commands\":$COMMANDS}" \
-            --query 'Command.CommandId' \
-            --output text)
-
-          echo "SSM Command ID: $COMMAND_ID"
 
           aws ssm wait command-executed \
             --region "$AWS_REGION" \
