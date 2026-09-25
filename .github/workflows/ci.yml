@@ -31,46 +31,53 @@ jobs:
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password \
-            --region $AWS_REGION | \
-            docker login \
+            --region "$AWS_REGION" | \
+          docker login \
             --username AWS \
             --password-stdin \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+            "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
       - name: Build Docker image
         run: |
           docker build \
-            -t $ECR_REPOSITORY:${{ github.sha }} \
+            -t "$ECR_REPOSITORY:${{ github.sha }}" \
             .
 
       - name: Tag Docker image
         run: |
           docker tag \
-            $ECR_REPOSITORY:${{ github.sha }} \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+            "$ECR_REPOSITORY:${{ github.sha }}" \
+            "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}"
 
       - name: Push Docker image to ECR
         run: |
           docker push \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
-            - name: Deploy to EC2 with SSM
+            "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}"
+
+      - name: Deploy to EC2 with SSM
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}"
+
+          COMMANDS=$(jq -nc \
+            --arg region "$AWS_REGION" \
+            --arg registry "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" \
+            --arg image "$IMAGE_URI" \
+            '[
+              "systemctl stop myapp.service || true",
+              "systemctl disable myapp.service || true",
+              ("aws ecr get-login-password --region " + $region + " | docker login --username AWS --password-stdin " + $registry),
+              ("docker pull " + $image),
+              "docker rm -f my-ec2-app || true",
+              ("docker run -d --name my-ec2-app --restart unless-stopped -p 8080:8080 " + $image),
+              "curl -f http://127.0.0.1:8080"
+            ]')
 
           COMMAND_ID=$(aws ssm send-command \
             --region "$AWS_REGION" \
             --instance-ids "i-08e8bec7102526dac" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy ${{ github.sha }}" \
-            --parameters "commands=[
-              \"systemctl stop myapp.service || true\",
-              \"systemctl disable myapp.service || true\",
-              \"aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com\",
-              \"docker pull $IMAGE_URI\",
-              \"docker rm -f my-ec2-app || true\",
-              \"docker run -d --name my-ec2-app --restart unless-stopped -p 8080:8080 $IMAGE_URI\",
-              \"curl -f http://127.0.0.1:8080\"
-            ]" \
+            --parameters "{\"commands\":$COMMANDS}" \
             --query 'Command.CommandId' \
             --output text)
 
